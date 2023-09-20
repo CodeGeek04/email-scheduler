@@ -3,6 +3,18 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import base64
+from datetime import datetime
+import time
+from email.mime.text import MIMEText
+import base64
+
+app_start_time = int(time.mktime(datetime.now().timetuple()))
+
+def read_emails(service):
+    query = 'is:unread'
+    results = service.users().messages().list(userId='me', q=query).execute()
+    messages = results.get('messages', [])
+    return messages
 
 # Initialize the Gmail API
 def get_gmail_service():
@@ -20,11 +32,6 @@ def get_gmail_service():
 
     return build('gmail', 'v1', credentials=creds)
 
-# Function to read unread emails
-def read_emails(service):
-    results = service.users().messages().list(userId='me', labelIds=['INBOX'], q="is:unread").execute()
-    messages = results.get('messages', [])
-    return messages
 
 # Function to send emails
 def send_email(service, to_email, content):
@@ -43,3 +50,17 @@ def send_email(service, to_email, content):
         service.users().messages().send(userId='me', body=message).execute()
     else:
         return "NOT SENDING"
+
+def save_draft(service, to, body):
+    message = MIMEText(body)
+    message['to'] = to
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    message = {'raw': raw_message}
+    
+    # Create a draft instead of sending the email
+    print("SHOULD I SAVE THIS EMAIL AS DRAFT, TO {}? CONTENT: {}".format(to_email, content))
+    resp = input("Y/N: ")
+    if resp == "y":
+        draft = service.users().drafts().create(userId='me', body={'message': message}).execute()
+        print(f"Draft created with ID: {draft['id']}")
+    else:

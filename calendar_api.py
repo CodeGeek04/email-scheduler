@@ -47,7 +47,7 @@ def fetch_free_time(service):
 
         free_time_string += f"Free from {last_end_time} to {two_months_later}"
 
-    print(free_time_string)
+    # print(free_time_string)
 
 if __name__ == '__main__':
     fetch_free_time()

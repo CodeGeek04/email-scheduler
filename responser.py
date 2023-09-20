@@ -1,18 +1,28 @@
-import openai
 from datetime import datetime
+import openai
 
-def query(sender, content):
-    return {"role": sender, "content": content}
+def query(role, content):
+    return {"role": role, "content": content}
 
-def generate_resp(email_body, email_address, free_time):
+def generate_resp(email_body, email_address, to_address, free_time, to_sender=True, cc=False):
     # Initialize the conversation with the assistant's role and a prompt
     today = datetime.now()
     formatted_date = today.strftime("%Y-%m-%d")
 
+    # Determine the prompt based on 'to_sender' and 'cc'
+    if to_sender and cc:
+        prompt = f"YOU ARE A MEETING SCHEDULER. MAKE A RESPONSE FOR THIS CC'd EMAIL- Email from {email_address} to {to_address}:\n{email_body}\n\n"
+    elif to_sender and not cc:
+        prompt = f"YOU ARE A MEETING SCHEDULER. MAKE A RESPONSE FOR THIS DIRECT EMAIL TO SENDER- Email from {email_address}:\n{email_body}\n\n"
+    elif not to_sender and cc:
+        prompt = f"YOU ARE A MEETING SCHEDULER. MAKE A RESPONSE FOR THIS CC'd EMAIL TO RECEIVER- Email from {email_address} to {to_address}:\n{email_body}\n\n"
+    else:
+        prompt = f"YOU ARE A MEETING SCHEDULER. MAKE A RESPONSE FOR THIS DIRECT EMAIL TO RECEIVER- Email from {email_address}:\n{email_body}\n\n"
+
     messages_list = [
         query("system", "You are a helpful assistant."),
-        query("user", f"MAKE A RESPONSE FOR THIS EMAIL ADDRESS- Email from {email_address}:\n{email_body}\n\n"),
-        query("system", f"Today is date is {formatted_date}. Free time: {free_time}")
+        query("user", prompt),
+        query("system", f"Today's date is {formatted_date}. Free time: {free_time}")
     ]
 
     # Generate a response using GPT-3.5-turbo
