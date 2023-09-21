@@ -1,23 +1,36 @@
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
 
 def get_services():
-    creds = None
-    # Combine the scopes for Gmail and Calendar
-    scopes = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/calendar']
+    # Load or authorize Gmail credentials
+    gmail_creds = None
+    gmail_scopes = ['https://www.googleapis.com/auth/gmail.modify']
 
-    if creds and not creds.valid:
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+    if gmail_creds and not gmail_creds.valid:
+        if gmail_creds.expired and gmail_creds.refresh_token:
+            gmail_creds.refresh(Request())
     else:
-        flow = InstalledAppFlow.from_client_secrets_file('combined_credentials.json', scopes)
-        creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+        flow = InstalledAppFlow.from_client_secrets_file('credentials.json', gmail_scopes)
+        gmail_creds = flow.run_local_server(port=0)
+        with open('gmail_token.json', 'w') as token:
+            token.write(gmail_creds.to_json())
 
-    gmail_service = build('gmail', 'v1', credentials=creds)
-    calendar_service = build('calendar', 'v3', credentials=creds)
+    # Load or authorize Calendar credentials
+    calendar_creds = None
+    calendar_scopes = ['https://www.googleapis.com/auth/calendar']
+
+    if calendar_creds and not calendar_creds.valid:
+        if calendar_creds.expired and calendar_creds.refresh_token:
+            calendar_creds.refresh(Request())
+    else:
+        flow = InstalledAppFlow.from_client_secrets_file('credentials.json', calendar_scopes)
+        calendar_creds = flow.run_local_server(port=0)
+        with open('calendar_token.json', 'w') as token:
+            token.write(calendar_creds.to_json())
+
+    # Build the services
+    gmail_service = build('gmail', 'v1', credentials=gmail_creds)
+    calendar_service = build('calendar', 'v3', credentials=calendar_creds)
 
     return gmail_service, calendar_service

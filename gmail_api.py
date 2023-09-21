@@ -44,12 +44,8 @@ def send_email(service, to_email, content):
             .encode('utf-8')
         ).decode('utf-8')
     }
-    print("SHOULD I SEND EMAIL TO {}? CONTENT: {}".format(to_email, content))
-    resp = input("Y/N: ")
-    if resp == "Y":
-        service.users().messages().send(userId='me', body=message).execute()
-    else:
-        return "NOT SENDING"
+    print("SENDING EMAIL TO CONTENT: {}".format(to_email, content))
+    service.users().messages().send(userId='me', body=message).execute()
 
 def save_draft(service, to, body):
     message = MIMEText(body)
@@ -64,3 +60,4 @@ def save_draft(service, to, body):
         draft = service.users().drafts().create(userId='me', body={'message': message}).execute()
         print(f"Draft created with ID: {draft['id']}")
     else:
+        print("NOT SAVING DRAFT")
