@@ -1,22 +1,37 @@
 from flask import Flask
-from gmail_api import read_emails, send_email, save_draft
+from gmail_api import read_emails, read_threads, send_email, reply_to_email
 from responser import generate_resp
 from calendar_api import fetch_free_time
 from services import get_services
 import os
 import pickle
+import base64
 import time
 
 app = Flask(__name__)
-assistant_email = "butler194401@gmail.com"
-owner_email = "shivammittal2124@gmail.com"
+with open('meta.txt', 'r') as f:
+    data = f.read().split()
+    owner_email = data[0]
+    assistant_email = data[1]
 
-def mark_as_read(gmail_service, email_id):
+print("ASSISTANT EMAIL: {}".format(assistant_email))
+print("OWNER EMAIL: {}".format(owner_email))
+# quit()
+
+def mark_email_as_read(gmail_service, email_id):
     gmail_service.users().messages().modify(
         userId='me',
         id=email_id,
         body={'removeLabelIds': ['UNREAD']}
     ).execute()
+
+def mark_thread_as_read(gmail_service, thread_id):
+    gmail_service.users().threads().modify(
+        userId='me',
+        id=thread_id,
+        body={'removeLabelIds': ['UNREAD']}
+    ).execute()
+
 
 def create_raw_email(to, sender, subject, message_text, bcc=None):
     """Create a raw email with the given details."""
@@ -31,43 +46,6 @@ def create_raw_email(to, sender, subject, message_text, bcc=None):
         message['bcc'] = bcc
 
     return base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
-
-
-def extract_forwarded_content(email_body):
-    """
-    Extracts the content from a forwarded email and all previous conversations.
-    """
-    # This is a simple extraction based on common email patterns.
-    # It may need adjustments based on the specific email format you're dealing with.
-    lines = email_body.split('\n')
-    forwarded_content = []
-    for line in lines:
-        forwarded_content.append(line[1:].strip())  # Remove the '>' and strip whitespace
-    return '\n'.join(forwarded_content)
-
-def send_reply(service, to, content, original_email_id):
-    """
-    Sends a reply to the original email.
-    """
-    # Create a reply
-    body = {
-        'raw': create_raw_email(to, assistant_email, "Re:", content)
-    }
-    # Send the reply
-    service.users().messages().send(userId='me', body=body).execute()
-
-def send_forward(service, to, content, original_email_id):
-    """
-    Forwards the original email with additional content.
-    """
-    # Fetch the original email
-    original_email = service.users().messages().get(userId='me', id=original_email_id).execute()
-    # Create a forward
-    body = {
-        'raw': create_raw_email(to, assistant_email, "Fwd:", content + "\n\n" + original_email['snippet'])
-    }
-    # Send the forward
-    service.users().messages().send(userId='me', body=body).execute()
 
 
 @app.route('/')
@@ -90,38 +68,78 @@ def index():
             pickle.dump(calendar_service, f)
 
     while True:
-        # Read new unread emails
+        new_threads = read_threads(gmail_service)
         new_emails = read_emails(gmail_service)
+        thread_ = False
 
-        for email_data in new_emails:
-            msg = gmail_service.users().messages().get(userId='me', id=email_data['id']).execute()
-            email_headers = msg['payload']['headers']
-            email_body = msg['snippet']
+        # If there are new threads
+        for thread in new_threads:
+            # Fetch all messages in the thread
+            full_thread = gmail_service.users().threads().get(userId='me', id=thread['id']).execute()
+            messages = full_thread.get('messages', [])
 
-            # Check if the email is forwarded
-            if "Fwd:" in email_body or "FW:" in email_body:
-                email_body = extract_forwarded_content(email_body)
+            # If the thread has only one message, treat it as a normal email and continue to the next iteration
+            if len(messages) == 1:
+                continue
 
-            email_address = [header['value'] for header in email_headers if header['name'] == 'From'][0]
-            cc_address = [header['value'] for header in email_headers if header['name'] == 'Cc']
-            to_address = [header['value'] for header in email_headers if header['name'] == 'To'][0]
+            thread_ = True
 
-            # For this example, we'll just print the email body and sender
-            print(f"Received email from {email_address} to {to_address}")
+            # Format the complete messages with order and context
+            formatted_messages = []
 
-            # Check if the bot is CC'd
-            if any('butler194401@gmail.com' in cc for cc in cc_address):
-                    # Fetch free times for both sender and receiver
-                free_time = fetch_free_time(calendar_service, owner_email)
-                print("FREE TIME: {}".format(free_time))
+            for index, message in enumerate(messages):
+                # Extract the complete message content
+                message_data = message['payload']['body'].get('data', '')
+                decoded_message = base64.urlsafe_b64decode(message_data).decode('utf-8', 'ignore') if message_data else str(message['snippet'])
+                
+                formatted_message = f"Message {index + 1}: {decoded_message}"
+                formatted_messages.append(formatted_message)
 
-                # Generate and send a response to the sender
-                sender_content, owner_content = generate_resp(email_body, email_address, to_address, free_time)
-                send_email(gmail_service, email_address, sender_content)
-                send_email(gmail_service, to_address, owner_content)
+            # Join the formatted messages with a separator for clarity
+            concatenated_messages = '\n\n'.join(formatted_messages)
 
-            mark_as_read(gmail_service, email_data['id'])
-        time.sleep(2)
+            # Generate a response using the concatenated messages
+            response = generate_resp(concatenated_messages, 'shivammittal2124work@gmail.com', owner_email, fetch_free_time(calendar_service, owner_email))
+
+            # Send the response via email
+            send_email(
+                gmail_service,
+                to_email="shivammittal2124work@gmail.com",
+                subject="Your Response",
+                body=response,
+                bcc_email=owner_email
+            )
+            
+            # Mark the thread as read
+            mark_thread_as_read(gmail_service, thread['id'])
+
+            print("SENT RESPONSE")
+
+        # Handle new emails (including threads with a single message)
+        if thread_:
+            continue
+        for email in new_emails:
+            # Extract the complete message content
+            msg = gmail_service.users().messages().get(userId='me', id=email['id']).execute()
+            message_data = msg['snippet']
+            decoded_message = str(message_data) if message_data else "No content available"
+
+            # Generate a response using the email message
+            response = generate_resp(decoded_message, 'shivammittal2124work@gmail.com', owner_email, fetch_free_time(calendar_service, owner_email))
+
+            # Send the response via email
+            send_email(
+                gmail_service,
+                to_email="shivammittal2124work@gmail.com",
+                subject="Your Response",
+                body=response,
+                bcc_email=owner_email
+            )
+            
+            # Mark the email as read
+            mark_email_as_read(gmail_service, email['id'])
+
+            print("SENT RESPONSE")
 
     return "Check your server console."
 

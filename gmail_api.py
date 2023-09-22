@@ -8,7 +8,13 @@ import time
 from email.mime.text import MIMEText
 import base64
 
-app_start_time = int(time.mktime(datetime.now().timetuple()))
+# app_start_time = int(time.mktime(datetime.now().timetuple()))
+
+def read_threads(service):
+    query = 'is:unread'
+    results = service.users().threads().list(userId='me', q=query).execute()
+    threads = results.get('threads', [])
+    return threads
 
 def read_emails(service):
     query = 'is:unread'
@@ -34,30 +40,39 @@ def get_gmail_service():
 
 
 # Function to send emails
-def send_email(service, to_email, content):
-    message = {
-        'raw': base64.urlsafe_b64encode(
-            f"Subject: Test Reply\n"
-            f"To: {to_email}\n"
-            f"\n"
-            f"{content}\n"
-            .encode('utf-8')
-        ).decode('utf-8')
-    }
-    print("SENDING EMAIL TO CONTENT: {}".format(to_email, content))
-    service.users().messages().send(userId='me', body=message).execute()
+def send_email(service, to_email, subject, body, bcc_email):
+    # Create the email in MIMEText format
+    from email.mime.text import MIMEText
+    import base64
 
-def save_draft(service, to, body):
-    message = MIMEText(body)
-    message['to'] = to
-    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    message = {'raw': raw_message}
+    email_msg = MIMEText(body)
+    email_msg['to'] = to_email
+    email_msg['subject'] = subject
+    email_msg['bcc'] = bcc_email
+
+    # Encode the email and send it
+    raw_email = base64.urlsafe_b64encode(email_msg.as_bytes()).decode('utf-8')
+    service.users().messages().send(userId='me', body={'raw': raw_email}).execute()
+
+def reply_to_email(service, original_message, reply_content):
+    # Extracting headers from the original message
+    headers = original_message['payload']['headers']
+    subject = next(header['value'] for header in headers if header['name'] == 'Subject')
+    message_id = next(header['value'] for header in headers if header['name'] == 'Message-ID')
+    references = next((header['value'] for header in headers if header['name'] == 'References'), None)
     
-    # Create a draft instead of sending the email
-    print("SHOULD I SAVE THIS EMAIL AS DRAFT, TO {}? CONTENT: {}".format(to_email, content))
-    resp = input("Y/N: ")
-    if resp == "y":
-        draft = service.users().drafts().create(userId='me', body={'message': message}).execute()
-        print(f"Draft created with ID: {draft['id']}")
-    else:
-        print("NOT SAVING DRAFT")
+    # Formatting the reply email
+    raw_email = (
+        f"Subject: {subject}\n"
+        f"In-Reply-To: {message_id}\n"
+        f"References: {references if references else message_id}\n"
+        f"\n"
+        f"{reply_content}\n"
+    ).encode('utf-8')
+    
+    message = {
+        'raw': base64.urlsafe_b64encode(raw_email).decode('utf-8')
+    }
+    
+    print("REPLYING TO EMAIL WITH SUBJECT: {}".format(subject))
+    service.users().messages().send(userId='me', body=message).execute()
