@@ -99,12 +99,12 @@ def index():
             concatenated_messages = '\n\n'.join(formatted_messages)
 
             # Generate a response using the concatenated messages
-            response = generate_resp(concatenated_messages, 'shivammittal2124work@gmail.com', owner_email, fetch_free_time(calendar_service, owner_email))
+            response = generate_resp(concatenated_messages, 'michael.gruen9@gmail.com', owner_email, fetch_free_time(calendar_service, owner_email))
 
             # Send the response via email
             send_email(
                 gmail_service,
-                to_email="shivammittal2124work@gmail.com",
+                to_email="michael.gruen9@gmail.com",
                 subject="Your Response",
                 body=response,
                 bcc_email=owner_email
@@ -125,12 +125,12 @@ def index():
             decoded_message = str(message_data) if message_data else "No content available"
 
             # Generate a response using the email message
-            response = generate_resp(decoded_message, 'shivammittal2124work@gmail.com', owner_email, fetch_free_time(calendar_service, owner_email))
+            response = generate_resp(decoded_message, 'michael.gruen9@gmail.com', owner_email, fetch_free_time(calendar_service, owner_email))
 
             # Send the response via email
             send_email(
                 gmail_service,
-                to_email="shivammittal2124work@gmail.com",
+                to_email="michael.gruen9@gmail.com",
                 subject="Your Response",
                 body=response,
                 bcc_email=owner_email
