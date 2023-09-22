@@ -1,5 +1,5 @@
 from flask import Flask
-from gmail_api import read_emails, read_threads, send_email, reply_to_email
+from gmail_api import read_emails, read_threads, send_email, reply_to_email, get_message_text
 from responser import generate_resp
 from calendar_api import fetch_free_time
 from services import get_services
