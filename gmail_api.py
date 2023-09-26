@@ -6,6 +6,7 @@ import base64
 from datetime import datetime
 import time
 from email.mime.text import MIMEText
+import copy, email
 
 
 def read_threads(service):
@@ -21,29 +22,27 @@ def read_emails(service):
     messages = results.get('messages', [])
     return messages
 
-
-def get_message_text(message):
-    payload = message['payload']
-    if 'parts' in payload:
-        for part in payload['parts']:
-            mimeType = part.get('mimeType')
-            body = part.get('body')
-            data = body.get('data')
-            if part.get('parts'):
-                for subpart in part.get('parts'):
-                    data = subpart.get('body').get('data')
-                    if data:
-                        text = base64.urlsafe_b64decode(data).decode('utf-8', 'ignore')
-                        return text
-            if mimeType == 'text/plain':
-                data = body.get('data')
-                if data:
-                    text = base64.urlsafe_b64decode(data).decode('utf-8', 'ignore')
-                    return text
+def data_encoder(text):
+    if text and len(text)>0:
+        message = base64.urlsafe_b64decode(text.encode('UTF8'))
+        message = str(message, 'utf-8')
+        message = email.message_from_string(message)
+        return message
     else:
-        text = base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8', 'ignore')
-        return text
+        return None
 
+def get_message_text(msg):
+    if msg.get('payload').get('parts', None):
+        parts = msg.get('payload').get('parts', None)
+        sub_part = copy.deepcopy(parts[0])
+        while sub_part.get("mimeType", None) != "text/plain":
+            try:
+                sub_part = copy.deepcopy(sub_part.get('parts', None)[0])
+            except Exception as e:
+                break
+        return data_encoder(sub_part.get('body', None).get('data', None)).as_string()
+    else:
+        return msg.get("snippet")
 
 # Initialize the Gmail API
 

@@ -5,23 +5,46 @@ from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 import json
 import pickle
+import firebase_admin
+from firebase_admin import credentials, storage
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+import json
+from cryptography.fernet import Fernet
 
-# Initialize the Calendar API
-def get_calendar_service():
-    creds = None
-    if creds and not creds.valid:
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-    else:
-        flow = InstalledAppFlow.from_client_secrets_file('credentials.json', ['https://www.googleapis.com/auth/calendar'])
-        creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+# Initialize Firebase Admin SDK (only do this once in your application)
+cred = credentials.Certificate('firebase_secrets.json')
+firebase_admin.initialize_app(cred, {
+    'storageBucket': 'enter-bucket-name-here'
+})
 
-    return build('calendar', 'v3', credentials=creds)
+def get_calendar_service(email_id):
+    # Fetch serialized credentials from Firebase Storage
+    bucket = storage.bucket()
+    blob = bucket.blob(email_id)
+    serialized_credentials = blob.download_as_text()
+
+    # Deserialize the credentials
+    # serialized_credentials = fernet.decrypt(encrypted_serialized_credentials)
+    cred_info = json.loads(serialized_credentials)
+    creds = Credentials(
+        token=cred_info['token'],
+        refresh_token=cred_info['refresh_token'],
+        token_uri=cred_info['token_uri'],
+        client_id=cred_info['client_id'],
+        client_secret=cred_info['client_secret'],
+        scopes=cred_info['scopes']
+    )
+
+    # Build the calendar service
+    service = build('calendar', 'v3', credentials=creds)
+    return service
+
 
 # Fetch free time slots for the next two months
-def fetch_free_time(calendar_service, email_address):
+def fetch_free_time(email_address):
+    calendar_service = get_calendar_service(email_address)
+
     now = datetime.utcnow()
     end_time = now + timedelta(days=20)
 
@@ -35,6 +58,10 @@ def fetch_free_time(calendar_service, email_address):
 
     # Extract the busy times
     busy_times = free_busy_response['calendars'][email_address]['busy']
+
+    # Check if there are no upcoming events
+    if not busy_times:
+        return "You are free for the next 20 days."
 
     # Calculate the free times based on the busy times
     free_slots = []
@@ -53,7 +80,7 @@ def fetch_free_time(calendar_service, email_address):
     free_slots_by_day = {}
     for start, end in free_slots:
         day = start.strftime('%Y-%m-%d')
-        time_range = f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+        time_range = f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')} GMT"
         if day in free_slots_by_day:
             free_slots_by_day[day].append(time_range)
         else:
@@ -70,7 +97,4 @@ def fetch_free_time(calendar_service, email_address):
 
 
 if __name__ == '__main__':
-    with open('calendar_service.pkl', 'rb') as f:
-            calendar_service = pickle.load(f)
-
-    print(fetch_free_time(calendar_service, "shivammittal2124@gmail.com"))
+    print(fetch_free_time("shivam@elysiuminnovations.ai"))
