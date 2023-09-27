@@ -17,24 +17,29 @@ Follow these steps to get started:
    ```bash
    npm install
 3. Run frontend
+   ```bash
    npm start
 
 ### Backend Python Scripts:
 1. Install the required Python packages:
+   ```bash
     pip install -r requirements.txt
 2. Start the backend server:
+   ```bash
     python app.py
 
-###Email Routing:
-Execute routes:
+### Email Routing:
+1. Execute routes:
+   ```bash
     python routes.py
-Authenticate the assistant email as prompted.
-Keep routes.py running. It will start receiving and sending emails based on the criteria.
 
-###Deployment
+2. Authenticate the assistant email as prompted.
+3. Keep routes.py running. It will start receiving and sending emails based on the criteria.
+
+### Deployment
 When deploying, be sure to update the routing for the "register" button on the frontend, as it currently is set up for local hosting.
 
-###Future Directions
+### Future Directions
 Reply Functionality: The bot currently initiates a new message for every email. The goal is to enhance it to reply within threads.
 
 Scalability: The vision is to adapt the bot for multiple owner-client interactions, rather than the current 1:1 configuration.
