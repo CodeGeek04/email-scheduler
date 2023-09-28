@@ -18,7 +18,7 @@ Follow these steps to get started:
    npm install
 3. Run frontend
    ```bash
-   npm start
+   node server.js
 
 ### Backend Python Scripts:
 1. Install the required Python packages:
