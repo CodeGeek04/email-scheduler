@@ -11,11 +11,12 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import json
 from cryptography.fernet import Fernet
+from uuid import uuid4
 
 # Initialize Firebase Admin SDK (only do this once in your application)
 cred = credentials.Certificate('firebase_secrets.json')
 firebase_admin.initialize_app(cred, {
-    'storageBucket': 'enter-bucket-name-here'
+    'storageBucket': 'userbot-285810.appspot.com'
 })
 
 def get_calendar_service(email_id):
@@ -94,6 +95,32 @@ def fetch_free_time(email_address):
         formatted_free_slots.append(f"{formatted_day}: {formatted_time_ranges}")
 
     return '\n'.join(formatted_free_slots)
+
+def create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time):
+    # Get the calendar service for the owner
+    owner_calendar_service = get_calendar_service(owner_email)
+
+    # Define event details
+    event = {
+        "summary": "Meeting with {}".format(client_email),  # Replace with your event summary
+        "start": {"dateTime": start_time + 'Z'},
+        "end": {"dateTime": end_time + 'Z'},
+        "attendees": [{"email": owner_email}, {"email": client_email}],
+        "organizer": {"email": assistant_email},
+        "conferenceData": {
+            "createRequest": {
+                "requestId": uuid4().hex,
+                "conferenceSolutionKey": {"type": "hangoutsMeet"}
+            }
+        },
+        "reminders": {"useDefault": True}
+    }
+    # Insert the event into the owner's calendar
+    try:
+        event = owner_calendar_service.events().insert(calendarId="primary", sendNotifications=True, body=event, conferenceDataVersion=1).execute()
+        return event
+    except Exception as e:
+        return f"Error creating event: {str(e)}"
 
 
 if __name__ == '__main__':

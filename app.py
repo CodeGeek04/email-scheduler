@@ -11,14 +11,10 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 app = Flask(__name__)
 
-with open('filekey.key', 'rb') as filekey:
-    key = filekey.read()
-fernet = Fernet(key)
-
 # Initialize Firebase Admin SDK
 cred = credentials.Certificate('firebase_secrets.json')
 firebase_admin.initialize_app(cred, {
-    'storageBucket': 'enter-bucket-name-here'
+    'storageBucket': 'userbot-285810.appspot.com'
 })
 
 @app.route('/')

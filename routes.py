@@ -1,13 +1,15 @@
 from flask import Flask
 from gmail_api import read_emails, read_threads, send_email, reply_to_email, get_message_text
-from responser import generate_resp
-from calendar_api import fetch_free_time
+from responder import generate_resp
+from calendar_api import fetch_free_time, create_calendar_event
+from list_emails import get_all_emails
 from services import get_services
 import os
 import pickle
 import base64
 import time
 from email.mime.text import MIMEText
+from event_planner import extract_meeting_info
 import base64
 import re
 
@@ -47,17 +49,61 @@ def create_raw_email(to, sender, subject, message_text, bcc=None):
 
     return base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
 
-def extract_email_address(email_string):
+def extract_email(email_string):
     """
-    Extract the email address from the email string.
+    Extracts email address from the provided string using a regular expression.
+    If the email is already in the correct format, return it as is.
     """
+    # Check if the email_string already matches the standard email format
+    if re.match(r"[^@]+@[^@]+\.[^@]+", email_string):
+        return email_string
+    
+    # Otherwise, extract the email from the string
     match = re.search(r'<(.*?)>', email_string)
-    return match.group(1) if match else email_string
+    if match:
+        return match.group(1)
+    return None
+
+def get_emails_from_thread(messages, assistant_email):
+    """
+    Extract the owner's and client's email from a list of messages.
+    """
+    all_owners = get_all_emails()
+    all_emails = []
+
+    for message in messages:
+        # Extract the 'From', 'To', 'Cc', and 'Bcc' headers from the message
+        from_email_list = [header['value'] for header in message['payload']['headers'] if header['name'].lower() == 'from']
+        to_email_list = [header['value'] for header in message['payload']['headers'] if header['name'].lower() == 'to']
+        cc_email_list = [header['value'] for header in message['payload']['headers'] if header['name'].lower() == 'cc']
+        bcc_email_list = [header['value'] for header in message['payload']['headers'] if header['name'].lower() == 'bcc']
+        
+        all_emails.extend(from_email_list + to_email_list + cc_email_list + bcc_email_list)
+    
+    # Deduplicate the email list
+    all_emails = list(set(all_emails))
+    print("All Emails: ", all_emails)
+    all_emails = [extract_email(email) for email in all_emails]
+    
+    # Identify owner's email
+    print("All Owners: ", all_owners)
+    owner_emails = [email for email in all_emails if email in all_owners and email != assistant_email]
+    owner_email = owner_emails[0] if owner_emails else None
+
+    # Identify client's email
+    client_emails = [email for email in all_emails if email != owner_email and email != assistant_email]
+    client_email = client_emails[0] if client_emails else None
+
+    return owner_email, client_email
+
 
 def get_emails(message, assistant_email):
     """
     Extract the owner's and client's email from the message.
     """
+
+    all_owners = get_all_emails()
+    
     # Extract the 'From', 'To', 'Cc', and 'Bcc' headers from the message
     from_email_list = [header['value'] for header in message['payload']['headers'] if header['name'].lower() == 'from']
     to_email_list = [header['value'] for header in message['payload']['headers'] if header['name'].lower() == 'to']
@@ -65,27 +111,27 @@ def get_emails(message, assistant_email):
     bcc_email_list = [header['value'] for header in message['payload']['headers'] if header['name'].lower() == 'bcc']
 
     all_emails = from_email_list + to_email_list + cc_email_list + bcc_email_list
-
+    all_emails = [extract_email(email) for email in all_emails if extract_email(email) is not None]
+    
     # Identify owner's email
-    owner_emails = [email for email in all_emails if "elysiuminnovations" in email]
+    # print("Assistant Email: ", assistant_email)
+    print("All Emails: ", all_emails)
+    print("All Owners: ", all_owners)
+    owner_emails = [email for email in all_emails if email in all_owners and email != assistant_email]
     owner_email = owner_emails[0] if owner_emails else None
-
-    if not owner_email:
-        return None, None
 
     # Identify client's email
     client_emails = [email for email in all_emails if email != owner_email and email != assistant_email]
     client_email = client_emails[0] if client_emails else None
 
-    if not owner_email or not client_email:
-        raise ValueError("One or more email headers are missing or invalid.")
-
     return owner_email, client_email
+
 
 
 
 @app.route('/')
 def index():
+    global assistant_email
     # Check if the service objects are saved in the current directory
     
     if os.path.exists('gmail_service.pkl'):
@@ -99,6 +145,8 @@ def index():
         # Save the service objects to disk
         with open('gmail_service.pkl', 'wb') as f:
             pickle.dump(gmail_service, f)
+        with open('assistant_email.txt', 'r') as f:
+            assistant_email = f.readline().strip()
 
     while True:
         new_threads = read_threads(gmail_service)
@@ -129,18 +177,38 @@ def index():
             concatenated_messages = '\n\n'.join(formatted_messages)
 
             # Generate a response using the concatenated messages
-            owner_email, client_email = get_emails(messages[0], assistant_email)
+            owner_email, client_email = get_emails_from_thread(messages, assistant_email)
 
             if not owner_email or not client_email:
-                print("NOT FROM ORGANIZATION")
+                print("THREAD NOT FROM ORGANIZATION")
                 mark_thread_as_read(gmail_service, thread['id'])
                 continue
 
-            owner_email = extract_email_address(owner_email)
-            client_email = extract_email_address(client_email)
+            # owner_email = extract_email_address(owner_email)
+            # client_email = extract_email_address(client_email)
             print("OWNER EMAIL: {}".format(owner_email))
             print("CLIENT EMAIL: {}".format(client_email))
-            body_reply, subject_reply = generate_resp(concatenated_messages, client_email, owner_email, fetch_free_time(owner_email))
+
+            try:
+                body_reply, subject_reply = generate_resp(concatenated_messages, client_email, owner_email, fetch_free_time(owner_email))
+            except:
+                print("OWNER NOT FROM ORGANIZATION")
+                mark_thread_as_read(gmail_service, thread['id'])
+                continue
+
+            print("SUBJECT: {}".format(subject_reply))
+            print("BODY: {}".format(body_reply))
+
+            meeting_info = extract_meeting_info(body_reply)
+            if meeting_info.meet:
+                print("MEETING CONFIRMED")
+                start_time = meeting_info.startTime
+                end_time = meeting_info.endTime
+                print("START TIME: {}".format(start_time))
+                print("END TIME: {}".format(end_time))
+                event = create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time)
+                meeting_link = event.get('hangoutLink', None)
+                body_reply += "\n\nMeeting scheduled for {} to {} GMT \n {}".format(start_time, end_time, meeting_link)
 
             # Send the response via email
             send_email(
@@ -167,16 +235,35 @@ def index():
             # Generate a response using the email message
             owner_email, client_email = get_emails(msg, assistant_email)
 
+            owner_email, client_email = get_emails(msg, assistant_email)
+
             if not owner_email or not client_email:
-                print("NOT FROM ORGANIZATION")
+                print("EMAIL NOT FROM ORGANIZATION")
                 mark_email_as_read(gmail_service, email['id'])
                 continue
 
-            owner_email = extract_email_address(owner_email)
-            client_email = extract_email_address(client_email)
+            # owner_email = extract_email_address(owner_email)
+            # client_email = extract_email_address(client_email)
             print("OWNER EMAIL: {}".format(owner_email))
             print("CLIENT EMAIL: {}".format(client_email))
-            body_reply, subject_reply = generate_resp(decoded_message, client_email, owner_email, fetch_free_time(owner_email))
+
+            try:
+                body_reply, subject_reply = generate_resp(decoded_message, client_email, owner_email, fetch_free_time(owner_email))
+            except:
+                print("OWNER NOT FROM ORGANIZATION")
+                mark_email_as_read(gmail_service, email['id'])
+                continue
+            
+            print("SUBJECT: {}".format(subject_reply))
+            print("BODY: {}".format(body_reply))
+
+            meeting_info = extract_meeting_info(body_reply)
+            if meeting_info.meet:
+                print("MEETING CONFIRMED")
+                start_time = meeting_info.startTime
+                end_time = meeting_info.endTime
+                event = create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time)
+                body_reply += "\n\nMeeting scheduled for {} to {} GMT".format(start_time, end_time)
 
             # Send the response via email
             send_email(
