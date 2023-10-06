@@ -121,6 +121,32 @@ def fetch_free_time(email_address, preferred_start_time="09:00", preferred_end_t
     total_free_slots = '\n'.join(formatted_free_slots) + f"\n(Time Zone: {calendar_timezone})"
     return total_free_slots
 
+def create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time):
+    # Get the calendar service for the owner
+    owner_calendar_service = get_calendar_service(owner_email)
+
+    # Define event details
+    event = {
+        "summary": "Meeting with {}".format(client_email),  # Replace with your event summary
+        "start": {"dateTime": start_time + 'Z'},
+        "end": {"dateTime": end_time + 'Z'},
+        "attendees": [{"email": owner_email}, {"email": client_email}],
+        "organizer": {"email": assistant_email},
+        "conferenceData": {
+            "createRequest": {
+                "requestId": uuid4().hex,
+                "conferenceSolutionKey": {"type": "hangoutsMeet"}
+            }
+        },
+        "reminders": {"useDefault": True}
+    }
+    # Insert the event into the owner's calendar
+    try:
+        event = owner_calendar_service.events().insert(calendarId="primary", sendNotifications=True, body=event, conferenceDataVersion=1).execute()
+        return event
+    except Exception as e:
+        return f"Error creating event: {str(e)}"
+
 
 
 

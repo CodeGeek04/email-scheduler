@@ -1,7 +1,13 @@
 from flask import Flask
+<<<<<<< HEAD
 from gmail_api import read_emails, read_threads, send_email, reply_to_email, get_message_text, reply_to_email_thread
 from responder import generate_resp
 from calendar_api import fetch_free_time, create_calendar_event, get_calendar_timezone
+=======
+from gmail_api import read_emails, read_threads, send_email, reply_to_email, get_message_text
+from responder import generate_resp
+from calendar_api import fetch_free_time, create_calendar_event
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
 from list_emails import get_all_emails
 from services import get_services
 import os
@@ -52,6 +58,7 @@ def create_raw_email(to, sender, subject, message_text, bcc=None):
 def extract_email(email_string):
     """
     Extracts email address from the provided string using a regular expression.
+<<<<<<< HEAD
     """
     # Extract the email from the string
     match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', email_string)
@@ -60,11 +67,28 @@ def extract_email(email_string):
     return None
 
 
+=======
+    If the email is already in the correct format, return it as is.
+    """
+    # Check if the email_string already matches the standard email format
+    if re.match(r"[^@]+@[^@]+\.[^@]+", email_string):
+        return email_string
+    
+    # Otherwise, extract the email from the string
+    match = re.search(r'<(.*?)>', email_string)
+    if match:
+        return match.group(1)
+    return None
+
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
 def get_emails_from_thread(messages, assistant_email):
     """
     Extract the owner's and client's email from a list of messages.
     """
+<<<<<<< HEAD
     print("GETTING EMAIL IDs FROM THREAD")
+=======
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
     all_owners = get_all_emails()
     all_emails = []
 
@@ -79,11 +103,19 @@ def get_emails_from_thread(messages, assistant_email):
     
     # Deduplicate the email list
     all_emails = list(set(all_emails))
+<<<<<<< HEAD
     all_emails = [extract_email(email) for email in all_emails]
     
     print("All Emails: ", all_emails)
     print("All Owners: ", all_owners)
     # Identify owner's email
+=======
+    print("All Emails: ", all_emails)
+    all_emails = [extract_email(email) for email in all_emails]
+    
+    # Identify owner's email
+    print("All Owners: ", all_owners)
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
     owner_emails = [email for email in all_emails if email in all_owners and email != assistant_email]
     owner_email = owner_emails[0] if owner_emails else None
 
@@ -98,7 +130,10 @@ def get_emails(message, assistant_email):
     """
     Extract the owner's and client's email from the message.
     """
+<<<<<<< HEAD
     print("GETTING EMAIL IDs FROM EMAIL")
+=======
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
 
     all_owners = get_all_emails()
     
@@ -192,8 +227,13 @@ def index():
 
             try:
                 body_reply, subject_reply = generate_resp(concatenated_messages, client_email, owner_email, fetch_free_time(owner_email))
+<<<<<<< HEAD
             except Exception as e:
                 print("EXCEPTION: ", e)
+=======
+            except:
+                print("OWNER NOT FROM ORGANIZATION")
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
                 mark_thread_as_read(gmail_service, thread['id'])
                 continue
 
@@ -205,11 +245,17 @@ def index():
                 print("MEETING CONFIRMED")
                 start_time = meeting_info.startTime
                 end_time = meeting_info.endTime
+<<<<<<< HEAD
                 timeZone = get_calendar_timezone(owner_email)
                 print("START TIME: {}".format(start_time))
                 print("END TIME: {}".format(end_time))
                 print("TIME ZONE: {}".format(timeZone))
                 event = create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time, timeZone)
+=======
+                print("START TIME: {}".format(start_time))
+                print("END TIME: {}".format(end_time))
+                event = create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time)
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
                 meeting_link = event.get('hangoutLink', None)
                 body_reply += "\n\nMeeting scheduled for {} to {} GMT \n {}".format(start_time, end_time, meeting_link)
 
@@ -241,6 +287,8 @@ def index():
             # Generate a response using the email message
             owner_email, client_email = get_emails(msg, assistant_email)
 
+            owner_email, client_email = get_emails(msg, assistant_email)
+
             if not owner_email or not client_email:
                 print("EMAIL NOT FROM ORGANIZATION")
                 mark_email_as_read(gmail_service, email['id'])
@@ -253,8 +301,13 @@ def index():
 
             try:
                 body_reply, subject_reply = generate_resp(decoded_message, client_email, owner_email, fetch_free_time(owner_email))
+<<<<<<< HEAD
             except Exception as e:
                 print("EXCEPTION: ", e)
+=======
+            except:
+                print("OWNER NOT FROM ORGANIZATION")
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
                 mark_email_as_read(gmail_service, email['id'])
                 continue
             
@@ -266,11 +319,15 @@ def index():
                 print("MEETING CONFIRMED")
                 start_time = meeting_info.startTime
                 end_time = meeting_info.endTime
+<<<<<<< HEAD
                 timeZone = get_calendar_timezone(owner_email)
                 print("START TIME: {}".format(start_time))
                 print("END TIME: {}".format(end_time))
                 print("TIME ZONE: {}".format(timeZone))
                 event = create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time, timeZone)
+=======
+                event = create_calendar_event(owner_email, client_email, assistant_email, start_time, end_time)
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
                 body_reply += "\n\nMeeting scheduled for {} to {} GMT".format(start_time, end_time)
 
             # Send the response via email

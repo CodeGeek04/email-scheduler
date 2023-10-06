@@ -11,7 +11,10 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 app = Flask(__name__)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 6588927f01f30ab668f02df8480384efcd6551ec
 # Initialize Firebase Admin SDK
 cred = credentials.Certificate('firebase_secrets.json')
 firebase_admin.initialize_app(cred, {
