@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 Readme file
 =======
 # Elysium Email Scheduler
