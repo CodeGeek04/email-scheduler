@@ -10,7 +10,7 @@ def create_event_format(suggested_time):
 
     # For simplicity, let's assume the meeting duration is 1 hour. 
     # You can adjust this or extract the end time from the bot's response if needed.
-    event_end_time = suggested_time + "T01:00:00"  # 1 hour after the start time
+    event_end_time = suggested_time + "T00:30:00"  # 30 min after the start time
 
     event = {
         "summary": "test meeting",
@@ -45,6 +45,7 @@ def schedule_meeting(reply, free_times):
     # Generate a response using GPT-4
     print("GENERATING RESPONSE")
     response = openai.ChatCompletion.create(
+        # model="gpt-3.5-turbo",
         model="gpt-4",
         messages=messages_list
     )

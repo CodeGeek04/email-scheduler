@@ -11,14 +11,11 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 app = Flask(__name__)
 
-with open('filekey.key', 'rb') as filekey:
-    key = filekey.read()
-fernet = Fernet(key)
 
 # Initialize Firebase Admin SDK
 cred = credentials.Certificate('firebase_secrets.json')
 firebase_admin.initialize_app(cred, {
-    'storageBucket': 'enter-bucket-name-here'
+    'storageBucket': 'userbot-285810.appspot.com'
 })
 
 @app.route('/')
@@ -27,7 +24,8 @@ def authenticate():
         'credentials.json',
         ['https://www.googleapis.com/auth/calendar']
     )
-    flow.redirect_uri = url_for('callback', _external=True)
+    flow.redirect_uri = url_for('callback', _external=True).replace("http://", "https://")
+    print(flow.redirect_uri)
     authorization_url, _ = flow.authorization_url(prompt='consent')
     return redirect(authorization_url)
 
@@ -37,7 +35,8 @@ def callback():
         'credentials.json',
         ['https://www.googleapis.com/auth/calendar']
     )
-    flow.redirect_uri = url_for('callback', _external=True)
+    flow.redirect_uri = url_for('callback', _external=True).replace("http://", "https://")
+    print(flow.redirect_uri)
     flow.fetch_token(authorization_response=request.url)
 
     # Get the user's email
@@ -63,7 +62,7 @@ def callback():
     return '''
     <html>
         <head>
-            <meta http-equiv="refresh" content="2;url=http://localhost:3000">
+            <meta http-equiv="refresh" content="2;url=https://scheduler-email-bot-frontend.vercel.app">
         </head>
         <body>
             <p>Authentication Complete, Redirecting.........</p>
@@ -72,4 +71,5 @@ def callback():
     '''
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

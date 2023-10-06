@@ -2,6 +2,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from bs4 import BeautifulSoup
 import base64
 from datetime import datetime
 import time
@@ -91,3 +92,26 @@ def reply_to_email(service, original_message, reply_content):
     }
 
     service.users().messages().send(userId='me', body=message).execute()
+
+def reply_to_email_thread(gmail_service, original_message, reply_text, to_email, bcc_email=None):
+    """
+    Reply to an email thread.
+    """
+    # Extract necessary headers from the original email
+    original_headers = original_message['payload']['headers']
+    message_id = next(header['value'] for header in original_headers if header['name'] == 'Message-ID')
+    references = next((header['value'] for header in original_headers if header['name'] == 'References'), '')
+    subject = next(header['value'] for header in original_headers if header['name'] == 'Subject')
+
+    # Create the reply email
+    message = MIMEText(reply_text)
+    message['to'] = to_email
+    if bcc_email:
+        message['bcc'] = bcc_email
+    message['subject'] = subject if subject.startswith('Re:') else 'Re: ' + subject
+    message['in-reply-to'] = message_id
+    message['references'] = references + ' ' + message_id if references else message_id
+
+    # Encode the message and send
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+    return gmail_service.users().messages().send(userId='me', body={'raw': raw}).execute()
